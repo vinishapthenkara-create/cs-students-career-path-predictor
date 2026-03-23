@@ -7,62 +7,66 @@ import joblib
 # -----------------------------
 model = joblib.load("career_model.pkl")
 
-# -----------------------------
-# App Title
-# -----------------------------
-st.title("CS Students Career Path Predictor")
+st.set_page_config(page_title="Career Predictor", layout="centered")
 
-st.write("Predict the future career path of CS students based on their academic profile.")
+st.title("🎯 CS Students Career Path Predictor")
+st.write("Fill student details to predict career path")
 
 # -----------------------------
-# User Inputs
+# USER INPUTS (ALL 11 FEATURES)
 # -----------------------------
-gpa = st.slider("GPA", 0.0, 10.0, 7.0)
+age = st.number_input("Age", 18, 30)
+cgpa = st.slider("CGPA", 0.0, 10.0, 7.0)
 
-age = st.slider("Age", 18, 30, 22)
+internships = st.number_input("Internships", 0, 10)
+projects = st.number_input("Projects", 0, 20)
+certifications = st.number_input("Certifications", 0, 10)
 
-gender = st.selectbox("Gender", ["Male", "Female"])
-
-major = st.selectbox("Major", ["Computer Science", "Data Science", "AI", "Cyber Security"])
-
-domain = st.selectbox("Interested Domain",
-                      ["Web Development",
-                       "Machine Learning",
-                       "Data Science",
-                       "Cyber Security",
-                       "Cloud Computing"])
-
-# -----------------------------
-# Encoding Inputs
-# -----------------------------
-gender_val = 1 if gender == "Male" else 0
-
-major_dict = {
-    "Computer Science":0,
-    "Data Science":1,
-    "AI":2,
-    "Cyber Security":3
-}
-
-domain_dict = {
-    "Web Development":0,
-    "Machine Learning":1,
-    "Data Science":2,
-    "Cyber Security":3,
-    "Cloud Computing":4
-}
-
-major_val = major_dict[major]
-domain_val = domain_dict[domain]
+coding_skills = st.selectbox("Coding Skills", ["Low", "Medium", "High"])
+communication = st.selectbox("Communication Skills", ["Low", "Medium", "High"])
+aptitude = st.selectbox("Aptitude", ["Low", "Medium", "High"])
+problem_solving = st.selectbox("Problem Solving", ["Low", "Medium", "High"])
+teamwork = st.selectbox("Teamwork", ["Low", "Medium", "High"])
+leadership = st.selectbox("Leadership", ["Low", "Medium", "High"])
 
 # -----------------------------
-# Prediction Button
+# ENCODING (same as training)
 # -----------------------------
-if st.button("Predict Career"):
+map_val = {"Low": 0, "Medium": 1, "High": 2}
 
-    input_data = pd.DataFrame([[age,gpa,gender_val,major_val,domain_val]],
-                              columns=["Age","GPA","Gender","Major","Interested Domain"])
+coding_skills = map_val[coding_skills]
+communication = map_val[communication]
+aptitude = map_val[aptitude]
+problem_solving = map_val[problem_solving]
+teamwork = map_val[teamwork]
+leadership = map_val[leadership]
 
-    prediction = model.predict(input_data)
+# -----------------------------
+# CREATE INPUT DATAFRAME
+# IMPORTANT: SAME ORDER AS TRAINING
+# -----------------------------
+input_data = pd.DataFrame([[
+    age, cgpa, internships, projects,
+    certifications, coding_skills,
+    communication, aptitude,
+    problem_solving, teamwork, leadership
+]], columns=[
+    'age', 'cgpa', 'internships', 'projects',
+    'certifications', 'coding_skills',
+    'communication', 'aptitude',
+    'problem_solving', 'teamwork', 'leadership'
+])
 
-    st.success(f"Predicted Career Path: {prediction[0]}")
+# -----------------------------
+# PREDICTION BUTTON
+# -----------------------------
+if st.button("Predict Career Path"):
+    try:
+        prediction = model.predict(input_data)
+        st.success(f"🎯 Predicted Career Path: {prediction[0]}")
+
+    except Exception as e:
+        st.error("❌ Error occurred!")
+        st.write("Error:", e)
+        st.write("Input shape:", input_data.shape)
+        st.write("Model expects:", model.n_features_in_)
