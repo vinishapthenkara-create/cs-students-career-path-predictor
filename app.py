@@ -1,72 +1,84 @@
 import streamlit as st
 import pandas as pd
-import joblib
+import numpy as np
 
-# -----------------------------
-# Load Model
-# -----------------------------
-model = joblib.load("career_model.pkl")
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingClassifier
 
-st.set_page_config(page_title="Career Predictor", layout="centered")
+# -------------------------------
+# Load Dataset
+# -------------------------------
+df = pd.read_csv("cs_students.csv")
 
+# -------------------------------
+# Data Preprocessing (same as notebook)
+# -------------------------------
+
+# Drop unwanted columns (if exist)
+df = df.drop(columns=['Student_ID', 'Name'], errors='ignore')
+
+# Fill missing values
+df.fillna(method='ffill', inplace=True)
+
+# Encode categorical columns
+le_dict = {}
+for col in df.select_dtypes(include='object').columns:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
+    le_dict[col] = le
+
+# -------------------------------
+# Split Data
+# -------------------------------
+
+
+X = df.drop("Future Career", axis=1)
+y = df["Future Career"]
+# Scaling
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Train model
+model = GradientBoostingClassifier()
+model.fit(X_scaled, y)
+
+# -------------------------------
+# STREAMLIT UI
+# -------------------------------
 st.title("🎯 CS Students Career Path Predictor")
-st.write("Fill student details to predict career path")
 
-# -----------------------------
-# USER INPUTS (ALL 11 FEATURES)
-# -----------------------------
-age = st.number_input("Age", 18, 30)
-cgpa = st.slider("CGPA", 0.0, 10.0, 7.0)
+st.write("Fill student details:")
 
-internships = st.number_input("Internships", 0, 10)
-projects = st.number_input("Projects", 0, 20)
-certifications = st.number_input("Certifications", 0, 10)
+# Create inputs dynamically (VERY IMPORTANT - matches dataset)
+input_data = {}
 
-coding_skills = st.selectbox("Coding Skills", ["Low", "Medium", "High"])
-communication = st.selectbox("Communication Skills", ["Low", "Medium", "High"])
-aptitude = st.selectbox("Aptitude", ["Low", "Medium", "High"])
-problem_solving = st.selectbox("Problem Solving", ["Low", "Medium", "High"])
-teamwork = st.selectbox("Teamwork", ["Low", "Medium", "High"])
-leadership = st.selectbox("Leadership", ["Low", "Medium", "High"])
+for col in X.columns:
+    if df[col].dtype == 'int64' or df[col].dtype == 'float64':
+        input_data[col] = st.number_input(f"{col}", value=float(df[col].mean()))
+    else:
+        input_data[col] = st.selectbox(f"{col}", le_dict[col].classes_)
 
-# -----------------------------
-# ENCODING (same as training)
-# -----------------------------
-map_val = {"Low": 0, "Medium": 1, "High": 2}
+# Convert to DataFrame
+input_df = pd.DataFrame([input_data])
 
-coding_skills = map_val[coding_skills]
-communication = map_val[communication]
-aptitude = map_val[aptitude]
-problem_solving = map_val[problem_solving]
-teamwork = map_val[teamwork]
-leadership = map_val[leadership]
+for col in input_df.columns:
+    if col in le_dict:
+        unseen = set(input_df[col]) - set(le_dict[col].classes_)
+        if unseen:
+            print(f"{col} has unseen values: {unseen}")
 
-# -----------------------------
-# CREATE INPUT DATAFRAME
-# IMPORTANT: SAME ORDER AS TRAINING
-# -----------------------------
-input_data = pd.DataFrame([[
-    age, cgpa, internships, projects,
-    certifications, coding_skills,
-    communication, aptitude,
-    problem_solving, teamwork, leadership
-]], columns=[
-    'age', 'cgpa', 'internships', 'projects',
-    'certifications', 'coding_skills',
-    'communication', 'aptitude',
-    'problem_solving', 'teamwork', 'leadership'
-])
 
-# -----------------------------
-# PREDICTION BUTTON
-# -----------------------------
-if st.button("Predict Career Path"):
-    try:
-        prediction = model.predict(input_data)
-        st.success(f"🎯 Predicted Career Path: {prediction[0]}")
+# Scale input
+input_scaled = scaler.transform(input_df)
 
-    except Exception as e:
-        st.error("❌ Error occurred!")
-        st.write("Error:", e)
-        st.write("Input shape:", input_data.shape)
-        st.write("Model expects:", model.n_features_in_)
+# -------------------------------
+# Prediction
+# -------------------------------
+if st.button("Predict Future Career"):
+    prediction = model.predict(input_scaled)
+
+    # Decode output
+    career_label = le_dict['Future Career'].inverse_transform(prediction)
+
+    st.success(f"🎯 Predicted Future Career: {career_label[0]}")
